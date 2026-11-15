@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      @keyframes tracePath {
+        0% { stroke-dashoffset: 2400; }
+        100% { stroke-dashoffset: 0; }
+      }
+      .owl-tracer {
+        stroke-dasharray: 2400;
+        stroke-dashoffset: 2400;
+        animation: tracePath 1.2s linear infinite;
+      }
+    </style>
+  </defs>
+
+  <!-- Outer contour -->
+  <path class="owl-tracer"
+        d="M 155,45 L 140,8 L 175,32 C 185,42 195,55 205,65 C 235,55 265,55 295,65 C 305,55 315,42 325,32 L 360,8 L 345,45 C 390,70 455,130 472,255 C 485,355 475,480 435,570 C 395,660 330,682 295,682 C 285,682 278,675 272,668 C 260,682 235,685 220,680 C 205,675 195,662 190,650 C 140,620 85,570 55,510 L 25,525 L 35,465 L 12,430 L 42,400 L 18,360 L 50,335 C 45,280 50,210 75,150 C 100,90 130,60 155,45 Z"
+        fill="none" stroke="#137333" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" />
+
+  <!-- Left & Right Eyes -->
+  <path d="M 175,135 C 150,135 125,160 120,195 C 115,225 140,245 165,235 C 195,225 210,190 200,165 C 192,145 185,135 175,135 Z"
+        fill="none" stroke="#137333" stroke-width="8" filter="url(#glow)" />
+  <path d="M 325,135 C 350,135 375,160 380,195 C 385,225 360,245 335,235 C 305,225 290,190 300,165 C 308,145 315,135 325,135 Z"
+        fill="none" stroke="#137333" stroke-width="8" filter="url(#glow)" />
+
+  <!-- Beak & Wing curve -->
+  <polygon points="250,230 235,320 265,320"
+           fill="none" stroke="#137333" stroke-width="7" stroke-linejoin="round" filter="url(#glow)" />
+  <path d="M 190,360 C 230,420 270,490 310,580 C 270,540 220,460 190,360 Z"
+        fill="none" stroke="#137333" stroke-width="6" stroke-linejoin="round" filter="url(#glow)" />
+</svg>
