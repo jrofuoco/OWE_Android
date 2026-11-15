@@ -41,20 +41,34 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.WorkspacePremium
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -106,6 +120,7 @@ fun ProfileScreen(
     var biometricEnabled by remember { mutableStateOf(true) }
     var remindersEnabled by remember { mutableStateOf(true) }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showSupportDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -326,6 +341,20 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
+            // Section: Security
+            item {
+                SettingsSectionTitle("SECURITY")
+                SettingsCardContainer {
+                    SettingsRowItem(
+                        icon = Icons.Outlined.Lock,
+                        title = "Change Password",
+                        subtitle = "Update your account password",
+                        onClick = { showChangePasswordDialog = true }
+                    )
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
             // Section 4: About
             item {
                 SettingsSectionTitle("ABOUT")
@@ -410,6 +439,13 @@ fun ProfileScreen(
         )
     }
 
+    if (showChangePasswordDialog) {
+        ChangePasswordDialog(
+            authRepository = authRepository,
+            onDismiss = { showChangePasswordDialog = false }
+        )
+    }
+
     if (showSupportDialog) {
         SupportTicketDialog(
             userEmail = email,
@@ -425,6 +461,444 @@ fun ProfileScreen(
 }
 
 @Composable
+private fun ChangePasswordDialog(
+    authRepository: AuthRepository,
+    onDismiss: () -> Unit
+) {
+    var oldPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+
+    var showOldPassword by remember { mutableStateOf(false) }
+    var showNewPassword by remember { mutableStateOf(false) }
+    var showConfirmPassword by remember { mutableStateOf(false) }
+
+    var oldPasswordError by remember { mutableStateOf<String?>(null) }
+    var newPasswordError by remember { mutableStateOf<String?>(null) }
+    var confirmPasswordError by remember { mutableStateOf<String?>(null) }
+
+    var isSubmitting by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    val canSubmit = !isSubmitting &&
+        oldPassword.isNotBlank() &&
+        newPassword.isNotBlank() &&
+        confirmPassword.isNotBlank()
+
+    fun validate(): Boolean {
+        var valid = true
+        if (oldPassword.isBlank()) {
+            oldPasswordError = "Please enter your old password."
+            valid = false
+        }
+        if (newPassword.length < 6) {
+            newPasswordError = "New password must be at least 6 characters."
+            valid = false
+        } else if (newPassword == oldPassword) {
+            newPasswordError = "New password must be different from old password."
+            valid = false
+        }
+        if (confirmPassword != newPassword) {
+            confirmPasswordError = "Passwords do not match."
+            valid = false
+        }
+        return valid
+    }
+
+    Dialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = White,
+            shadowElevation = 16.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 24.dp)
+            ) {
+                // Header Row with Icon Badge + Title & Close Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(StatusActiveBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Lock,
+                                contentDescription = null,
+                                tint = ForestGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column {
+                            Text(
+                                text = "Change Password",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Dark12,
+                                    fontSize = 19.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Keep your account secure",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = GrayText,
+                                    fontSize = 12.5.sp
+                                )
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { if (!isSubmitting) onDismiss() },
+                        enabled = !isSubmitting,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(GraySurface)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            tint = Dark12,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Enter your current password and choose a strong new password for your account.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = GrayText,
+                        fontSize = 13.5.sp,
+                        lineHeight = 19.sp
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Old Password Field
+                Text(
+                    text = "Old Password",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Dark12
+                    ),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                OutlinedTextField(
+                    value = oldPassword,
+                    onValueChange = {
+                        oldPassword = it
+                        oldPasswordError = null
+                    },
+                    placeholder = {
+                        Text(
+                            text = "Enter current password",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GrayText.copy(alpha = 0.65f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = GrayText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { showOldPassword = !showOldPassword }) {
+                            Icon(
+                                imageVector = if (showOldPassword) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                                contentDescription = null,
+                                tint = GrayText,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
+                    visualTransformation = if (showOldPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Next
+                    ),
+                    isError = oldPasswordError != null,
+                    singleLine = true,
+                    enabled = !isSubmitting,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        unfocusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        disabledContainerColor = GraySurface.copy(alpha = 0.25f),
+                        errorContainerColor = GraySurface.copy(alpha = 0.4f),
+                        focusedBorderColor = ForestGreen,
+                        unfocusedBorderColor = GrayBorder,
+                        errorBorderColor = StatusOverdueText,
+                        disabledBorderColor = GrayBorder.copy(alpha = 0.6f),
+                        focusedTextColor = Dark12,
+                        unfocusedTextColor = Dark12,
+                        cursorColor = ForestGreen
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (oldPasswordError != null) {
+                    Text(
+                        text = oldPasswordError.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StatusOverdueText,
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // New Password Field
+                Text(
+                    text = "New Password",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Dark12
+                    ),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                OutlinedTextField(
+                    value = newPassword,
+                    onValueChange = {
+                        newPassword = it
+                        newPasswordError = null
+                        if (confirmPasswordError != null && confirmPassword == it) {
+                            confirmPasswordError = null
+                        }
+                    },
+                    placeholder = {
+                        Text(
+                            text = "At least 6 characters",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GrayText.copy(alpha = 0.65f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = GrayText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { showNewPassword = !showNewPassword }) {
+                            Icon(
+                                imageVector = if (showNewPassword) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                                contentDescription = null,
+                                tint = GrayText,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
+                    visualTransformation = if (showNewPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Next
+                    ),
+                    isError = newPasswordError != null,
+                    singleLine = true,
+                    enabled = !isSubmitting,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        unfocusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        disabledContainerColor = GraySurface.copy(alpha = 0.25f),
+                        errorContainerColor = GraySurface.copy(alpha = 0.4f),
+                        focusedBorderColor = ForestGreen,
+                        unfocusedBorderColor = GrayBorder,
+                        errorBorderColor = StatusOverdueText,
+                        disabledBorderColor = GrayBorder.copy(alpha = 0.6f),
+                        focusedTextColor = Dark12,
+                        unfocusedTextColor = Dark12,
+                        cursorColor = ForestGreen
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (newPasswordError != null) {
+                    Text(
+                        text = newPasswordError.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StatusOverdueText,
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Confirm Password Field
+                Text(
+                    text = "Confirm Password",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Dark12
+                    ),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = {
+                        confirmPassword = it
+                        confirmPasswordError = null
+                    },
+                    placeholder = {
+                        Text(
+                            text = "Re-enter new password",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GrayText.copy(alpha = 0.65f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = GrayText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { showConfirmPassword = !showConfirmPassword }) {
+                            Icon(
+                                imageVector = if (showConfirmPassword) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                                contentDescription = null,
+                                tint = GrayText,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
+                    visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
+                    isError = confirmPasswordError != null,
+                    singleLine = true,
+                    enabled = !isSubmitting,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        unfocusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        disabledContainerColor = GraySurface.copy(alpha = 0.25f),
+                        errorContainerColor = GraySurface.copy(alpha = 0.4f),
+                        focusedBorderColor = ForestGreen,
+                        unfocusedBorderColor = GrayBorder,
+                        errorBorderColor = StatusOverdueText,
+                        disabledBorderColor = GrayBorder.copy(alpha = 0.6f),
+                        focusedTextColor = Dark12,
+                        unfocusedTextColor = Dark12,
+                        cursorColor = ForestGreen
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (confirmPasswordError != null) {
+                    Text(
+                        text = confirmPasswordError.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StatusOverdueText,
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(22.dp))
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        enabled = !isSubmitting,
+                        shape = RoundedCornerShape(100.dp),
+                        border = BorderStroke(1.dp, GrayBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            color = Dark12,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Button(
+                        enabled = canSubmit,
+                        onClick = {
+                            if (!validate()) return@Button
+                            scope.launch {
+                                isSubmitting = true
+                                authRepository.changePassword(
+                                    oldPassword = oldPassword,
+                                    newPassword = newPassword
+                                ).onSuccess {
+                                    isSubmitting = false
+                                    xyz.iamdua.owe.ui.components.AppFeedback.showSuccess("Password updated successfully!")
+                                    onDismiss()
+                                }.onFailure { err ->
+                                    isSubmitting = false
+                                    val msg = err.message ?: "Failed to update password."
+                                    if (msg.contains("incorrect", ignoreCase = true) || msg.contains("invalid", ignoreCase = true)) {
+                                        oldPasswordError = "Current password is incorrect."
+                                    } else {
+                                        xyz.iamdua.owe.ui.components.AppFeedback.showError(msg)
+                                    }
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(100.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ForestGreen,
+                            contentColor = White,
+                            disabledContainerColor = GrayBorder,
+                            disabledContentColor = GrayText
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text(
+                            text = if (isSubmitting) "Updating..." else "Update",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SupportTicketDialog(
     userEmail: String,
     onDismiss: () -> Unit
@@ -432,143 +906,458 @@ private fun SupportTicketDialog(
     var subject by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
-    androidx.compose.material3.AlertDialog(
+    val canSubmit = !isSubmitting && subject.isNotBlank() && message.isNotBlank()
+
+    Dialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
-        containerColor = White,
-        title = {
-            Text(
-                text = "Help & Support",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Dark12
-                )
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = White,
+            shadowElevation = 16.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 24.dp)
+            ) {
+                // Header Row with Icon Badge + Title & Close Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(StatusActiveBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                                contentDescription = null,
+                                tint = ForestGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column {
+                            Text(
+                                text = "Help & Support",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Dark12,
+                                    fontSize = 19.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "We usually reply within 24h",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = GrayText,
+                                    fontSize = 12.5.sp
+                                )
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { if (!isSubmitting) onDismiss() },
+                        enabled = !isSubmitting,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(GraySurface)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            tint = Dark12,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
-                    text = "Describe your issue or question and we'll get back to you.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = GrayText)
+                    text = "Describe your issue or question below and our support team will get back to you.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = GrayText,
+                        fontSize = 13.5.sp,
+                        lineHeight = 19.sp
+                    )
                 )
-                androidx.compose.material3.OutlinedTextField(
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Subject Field
+                Text(
+                    text = "Subject",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Dark12
+                    ),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                OutlinedTextField(
                     value = subject,
                     onValueChange = { subject = it },
-                    label = { Text("Subject") },
+                    placeholder = {
+                        Text(
+                            text = "e.g., Payment confirmation issue",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GrayText.copy(alpha = 0.65f)
+                        )
+                    },
                     singleLine = true,
                     enabled = !isSubmitting,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        unfocusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        disabledContainerColor = GraySurface.copy(alpha = 0.25f),
+                        focusedBorderColor = ForestGreen,
+                        unfocusedBorderColor = GrayBorder,
+                        disabledBorderColor = GrayBorder.copy(alpha = 0.6f),
+                        focusedTextColor = Dark12,
+                        unfocusedTextColor = Dark12,
+                        cursorColor = ForestGreen
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
-                androidx.compose.material3.OutlinedTextField(
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Message Field
+                Text(
+                    text = "Message",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Dark12
+                    ),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                OutlinedTextField(
                     value = message,
                     onValueChange = { message = it },
-                    label = { Text("Message") },
-                    minLines = 3,
-                    maxLines = 5,
+                    placeholder = {
+                        Text(
+                            text = "Tell us more about what happened...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GrayText.copy(alpha = 0.65f)
+                        )
+                    },
+                    minLines = 4,
+                    maxLines = 6,
                     enabled = !isSubmitting,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        unfocusedContainerColor = GraySurface.copy(alpha = 0.4f),
+                        disabledContainerColor = GraySurface.copy(alpha = 0.25f),
+                        focusedBorderColor = ForestGreen,
+                        unfocusedBorderColor = GrayBorder,
+                        disabledBorderColor = GrayBorder.copy(alpha = 0.6f),
+                        focusedTextColor = Dark12,
+                        unfocusedTextColor = Dark12,
+                        cursorColor = ForestGreen
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(
-                enabled = !isSubmitting && subject.isNotBlank() && message.isNotBlank(),
-                onClick = {
-                    scope.launch {
-                        isSubmitting = true
-                        runCatching {
-                            val client = xyz.iamdua.owe.data.remote.SupabaseClientProvider.client
-                            val uid = client.auth.currentUserOrNull()?.id
-                                ?: error("Please sign in again.")
-                            client.from("support_tickets").insert(
-                                kotlinx.serialization.json.buildJsonObject {
-                                    put("user_id", kotlinx.serialization.json.JsonPrimitive(uid))
-                                    put("email", kotlinx.serialization.json.JsonPrimitive(userEmail))
-                                    put("subject", kotlinx.serialization.json.JsonPrimitive(subject.trim()))
-                                    put("message", kotlinx.serialization.json.JsonPrimitive(message.trim()))
-                                }
+
+                if (userEmail.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = GraySurface.copy(alpha = 0.7f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Mail,
+                                contentDescription = null,
+                                tint = GrayText,
+                                modifier = Modifier.size(15.dp)
                             )
-                        }.onSuccess {
-                            isSubmitting = false
-                            xyz.iamdua.owe.ui.components.AppFeedback.showSuccess("Support ticket sent!")
-                            onDismiss()
-                        }.onFailure { err ->
-                            isSubmitting = false
-                            xyz.iamdua.owe.ui.components.AppFeedback.showError(
-                                err.message ?: "Failed to send support ticket."
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Replies will be sent to $userEmail",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = GrayText,
+                                    fontSize = 12.sp
+                                )
                             )
                         }
                     }
                 }
-            ) {
-                Text(if (isSubmitting) "Sending..." else "Send", color = Dark12, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(
-                enabled = !isSubmitting,
-                onClick = onDismiss
-            ) {
-                Text("Cancel", color = GrayText)
+
+                Spacer(modifier = Modifier.height(22.dp))
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        enabled = !isSubmitting,
+                        shape = RoundedCornerShape(100.dp),
+                        border = BorderStroke(1.dp, GrayBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            color = Dark12,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Button(
+                        enabled = canSubmit,
+                        onClick = {
+                            scope.launch {
+                                isSubmitting = true
+                                runCatching {
+                                    val client = xyz.iamdua.owe.data.remote.SupabaseClientProvider.client
+                                    val uid = client.auth.currentUserOrNull()?.id
+                                        ?: error("Please sign in again.")
+                                    client.from("support_tickets").insert(
+                                        kotlinx.serialization.json.buildJsonObject {
+                                            put("user_id", kotlinx.serialization.json.JsonPrimitive(uid))
+                                            put("email", kotlinx.serialization.json.JsonPrimitive(userEmail))
+                                            put("subject", kotlinx.serialization.json.JsonPrimitive(subject.trim()))
+                                            put("message", kotlinx.serialization.json.JsonPrimitive(message.trim()))
+                                        }
+                                    )
+                                }.onSuccess {
+                                    isSubmitting = false
+                                    xyz.iamdua.owe.ui.components.AppFeedback.showSuccess("Support ticket sent!")
+                                    onDismiss()
+                                }.onFailure { err ->
+                                    isSubmitting = false
+                                    xyz.iamdua.owe.ui.components.AppFeedback.showError(
+                                        err.message ?: "Failed to send support ticket."
+                                    )
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(100.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ForestGreen,
+                            contentColor = White,
+                            disabledContainerColor = GrayBorder,
+                            disabledContentColor = GrayText
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text(
+                            text = if (isSubmitting) "Sending..." else "Send Message",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
-    )
+    }
 }
 
 @Composable
 private fun TermsPrivacyDialog(
     onDismiss: () -> Unit
 ) {
-    androidx.compose.material3.AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        containerColor = White,
-        title = {
-            Text(
-                text = "Terms & Privacy Policy",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Dark12
-                )
-            )
-        },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = White,
+            shadowElevation = 16.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 24.dp)
             ) {
-                Text(
-                    text = "1. Debt Records & Agreements",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, color = Dark12)
-                )
-                Text(
-                    text = "OWE helps you track personal loans, invite codes, and payment confirmations. Recorded entries reflect agreements between you and your counterparty.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = GrayText)
-                )
-                Text(
-                    text = "2. Data & Privacy",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, color = Dark12)
-                )
-                Text(
-                    text = "Your account details, debt records, and payment proofs are stored securely and used solely to verify your account, connect lenders and borrowers, and sync your ledger.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = GrayText)
-                )
-                Text(
-                    text = "3. Support & Account Deletion",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, color = Dark12)
-                )
-                Text(
-                    text = "You may contact us anytime via Help & Support for questions, corrections, or account assistance.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = GrayText)
-                )
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Close", color = Dark12, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(StatusActiveBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Description,
+                                contentDescription = null,
+                                tint = ForestGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Text(
+                            text = "Terms & Privacy",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Dark12,
+                                fontSize = 19.sp
+                            )
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(GraySurface)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            tint = Dark12,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = GraySurface.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "1. Debt Records & Agreements",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Dark12
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "OWE helps you track personal loans, invite codes, and payment confirmations. Recorded entries reflect agreements between you and your counterparty.",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = GrayText,
+                                    lineHeight = 18.sp
+                                )
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = GraySurface.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "2. Data & Privacy",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Dark12
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Your account details, debt records, and payment proofs are stored securely and used solely to verify your account, connect lenders and borrowers, and sync your ledger.",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = GrayText,
+                                    lineHeight = 18.sp
+                                )
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = GraySurface.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "3. Support & Account Deletion",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Dark12
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "You may contact us anytime via Help & Support for questions, corrections, or account assistance.",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = GrayText,
+                                    lineHeight = 18.sp
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(100.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Dark12,
+                        contentColor = White
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text(
+                        text = "Got It",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
-    )
+    }
 }
 
 @Composable

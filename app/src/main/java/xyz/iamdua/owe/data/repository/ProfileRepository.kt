@@ -49,7 +49,7 @@ class ProfileRepository {
         }
     }
 
-    suspend fun getMyProfile(forceRefresh: Boolean = false): Result<ProfileDto> = runCatching {
+    suspend fun getMyProfile(forceRefresh: Boolean = true): Result<ProfileDto> = runCatching {
         ensureHydrated()
         val uid = auth.currentUserOrNull()?.id ?: error("Not authenticated")
         if (!forceRefresh) {
@@ -67,7 +67,7 @@ class ProfileRepository {
 
     suspend fun getProfilesByIds(
         ids: List<String>,
-        forceRefresh: Boolean = false
+        forceRefresh: Boolean = true
     ): Result<Map<String, ProfileDto>> = runCatching {
         ensureHydrated()
         val distinctIds = ids.distinct()
@@ -111,6 +111,7 @@ class ProfileRepository {
             }
         profileCache[uid]?.let { existing ->
             profileCache[uid] = existing.copy(fullName = trimmedName, phone = trimmedPhone)
+            LocalDiskCache.saveProfiles(profileCache.values)
         }
     }
 }

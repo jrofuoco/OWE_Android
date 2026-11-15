@@ -87,12 +87,15 @@ class HomeViewModel(
 
     fun selectBottomNav(item: BottomNavItem) {
         _uiState.update { it.copy(selectedBottomNav = item) }
+        if (item == BottomNavItem.PROFILE) {
+            refresh(forceProfiles = true)
+        }
     }
 
     fun refresh(forceProfiles: Boolean = false) {
         val now = System.currentTimeMillis()
         if (!forceProfiles && now - lastLoadTimeMs < 3_000L) return
-        loadData(forceProfiles = forceProfiles)
+        loadData(forceProfiles = true)
     }
 
     fun loadMoreDebts() {
@@ -151,7 +154,7 @@ class HomeViewModel(
         }
     }
 
-    private fun loadData(forceProfiles: Boolean = false) {
+    private fun loadData(forceProfiles: Boolean = true) {
         if (_uiState.value.isRefreshing) return
         lastLoadTimeMs = System.currentTimeMillis()
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {

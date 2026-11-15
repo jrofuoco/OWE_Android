@@ -87,6 +87,22 @@ class AuthRepository {
         }
     }
 
+    suspend fun changePassword(oldPassword: String, newPassword: String): Result<Unit> = runCatching {
+        val currentEmail = auth.currentUserOrNull()?.email?.takeIf { it.isNotBlank() }
+            ?: error("Please sign in again.")
+        runCatching {
+            auth.signInWith(Email) {
+                this.email = currentEmail
+                this.password = oldPassword
+            }
+        }.onFailure {
+            error("Current password is incorrect.")
+        }
+        auth.updateUser {
+            password = newPassword
+        }
+    }
+
     suspend fun signOut(): Result<Unit> = runCatching {
         ProfileRepository.clearCache()
         DebtRepository.clearCache()
