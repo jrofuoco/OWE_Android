@@ -18,6 +18,7 @@ class RegisterViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
+
     private val authRepository: AuthRepository = AuthRepository()
     private val psgcRepository: PsgcRepository = PsgcRepository(application)
 
